@@ -8,7 +8,7 @@ tag=courchesnea/$(repo):$(branch)
 build:
 	docker build --pull -t $(tag) .
 
-run:
+run: build
 	docker run -it $(tag) /bin/bash
 
 build-no-cache:
