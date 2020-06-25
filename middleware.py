@@ -23,7 +23,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Thread
 from typing import cast, Dict, List  # Iterator
-from datetime import datetime
 
 # import numpy as np
 
@@ -327,10 +326,8 @@ def run_episode(sim_ci: ComponentInterface,
     playable_robots = [_ for _ in scenario.robots if scenario.robots[_].playable]
     not_playable_robots = [_ for _ in scenario.robots if not scenario.robots[_].playable]
     playable_robots2agent: Dict[str, ComponentInterface] = {_: v for _, v in zip(playable_robots, agents)}
-    starttime = datetime.now()
 
     while True:
-        logger.info("start loop")
         if current_sim_time >= episode_length_s:
             logger.info('Reached %1.f seconds. Finishing. ' % episode_length_s)
             break
@@ -338,7 +335,6 @@ def run_episode(sim_ci: ComponentInterface,
         tt = TimeTracker(steps)
         t_effective = current_sim_time
         for robot_name in playable_robots:
-            logger.debug("for a robot loop")
             agent = playable_robots2agent[robot_name]
 
             # have this first, so we have something for t = 0
@@ -347,7 +343,7 @@ def run_episode(sim_ci: ComponentInterface,
                 _recv: MsgReceived[RobotState] = \
                     sim_ci.write_topic_and_expect('get_robot_state', grs,
                                                   expect='robot_state')
-            logger.debug("Received initial robot state from sim")
+            logger.info("Received initial robot state from sim")
 
             with tt.measure(f'sim_compute_performance-{robot_name}'):
 
@@ -355,7 +351,7 @@ def run_episode(sim_ci: ComponentInterface,
                     sim_ci.write_topic_and_expect('get_robot_performance',
                                                   robot_name,
                                                   expect='robot_performance')
-            logger.debug("received robot performance from sim")
+            logger.info("received robot performance from sim")
 
             with tt.measure(f'sim_render-{robot_name}'):
                 gro = GetRobotObservations(robot_name=robot_name, t_effective=t_effective)
@@ -363,20 +359,20 @@ def run_episode(sim_ci: ComponentInterface,
                     sim_ci.write_topic_and_expect('get_robot_observations', gro,
                                                   expect='robot_observations')
 
-            logger.debug("Received robot observations from sim")
+            logger.info("Received robot observations from sim")
 
             with tt.measure(f'agent_compute-{robot_name}'):
                 try:
-                    logger.debug("Sending observation to agent")
+                    logger.info("Sending observation to agent")
                     agent.write_topic_and_expect_zero('observations', recv.data.observations)
                     gc = GetCommands(at_time=time.time())
-                    logger.debug("Querying commands to agent")
+                    logger.info("Querying commands to agent")
                     r: MsgReceived = agent.write_topic_and_expect('get_commands',gc , expect='commands')
 
                 except BaseException as e:
                     msg = 'Trouble with communication to the agent.'
                     raise dc.InvalidSubmission(msg) from e
-            logger.debug("Received commands from agent")
+            logger.info("Received commands from agent")
 
             with tt.measure('set_robot_commands'):
                 commands = SetRobotCommands(robot_name=robot_name, commands=r.data, t_effective=t_effective)
@@ -384,14 +380,14 @@ def run_episode(sim_ci: ComponentInterface,
 
         for robot_name in not_playable_robots:
             with tt.measure(f'sim_compute_robot_state-{robot_name}'):
-                logger.debug("get robot state")
+                logger.info("get robot state")
                 rs = GetRobotState(robot_name=robot_name, t_effective=t_effective)
                 _recv: MsgReceived[RobotState] = \
                     sim_ci.write_topic_and_expect('get_robot_state', rs,
                                                   expect='robot_state')
 
         with tt.measure('sim_compute_sim_state'):
-            logger.debug("Computing sim state")
+            logger.info("Computing sim state")
             recv: MsgReceived[SimulationState] = \
                 sim_ci.write_topic_and_expect('get_sim_state', expect='sim_state')
 
@@ -401,12 +397,9 @@ def run_episode(sim_ci: ComponentInterface,
                 break
 
         with tt.measure('sim_physics'):
-            logger.debug("calling sim_step")
+            logger.info("calling sim_step")
             current_sim_time += physics_dt
-            #logger.warning(f"before step: {datetime.now() - starttime}")
             sim_ci.write_topic_and_expect_zero('step', Step(current_sim_time))
-            #logger.warning(f"after step: {datetime.now() - starttime}")
-            logger.debug("Received sim step")
 
         # Following line disabled because we don't have a cc, if we need logging set sim_ci._cc and enable
         # log_timing_info(tt, sim_ci)
