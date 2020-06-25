@@ -343,7 +343,7 @@ def run_episode(sim_ci: ComponentInterface,
                 _recv: MsgReceived[RobotState] = \
                     sim_ci.write_topic_and_expect('get_robot_state', grs,
                                                   expect='robot_state')
-            logger.info("Received initial robot state from sim")
+            logger.debug("Received initial robot state from sim")
 
             with tt.measure(f'sim_compute_performance-{robot_name}'):
 
@@ -351,7 +351,7 @@ def run_episode(sim_ci: ComponentInterface,
                     sim_ci.write_topic_and_expect('get_robot_performance',
                                                   robot_name,
                                                   expect='robot_performance')
-            logger.info("received robot performance from sim")
+            logger.debug("received robot performance from sim")
 
             with tt.measure(f'sim_render-{robot_name}'):
                 gro = GetRobotObservations(robot_name=robot_name, t_effective=t_effective)
@@ -372,7 +372,7 @@ def run_episode(sim_ci: ComponentInterface,
                 except BaseException as e:
                     msg = 'Trouble with communication to the agent.'
                     raise dc.InvalidSubmission(msg) from e
-            logger.info("Received commands from agent")
+            logger.debug("Received commands from agent")
 
             with tt.measure('set_robot_commands'):
                 commands = SetRobotCommands(robot_name=robot_name, commands=r.data, t_effective=t_effective)
