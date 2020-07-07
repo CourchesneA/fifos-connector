@@ -131,13 +131,12 @@ def main():
         agent_ci.write_topic_and_expect_zero('seed', config.seed)
         logger.info("Received feedback from peer containers")
 
-        # TODO this should be in docker-compose or yaml config
-        map_name = "loop_empty"
+        # TODO we should have a proper handling of invalid map name
+        map_name = os.environ.get('MAP_NAME', 'loop_empty')
         yaml_string: str = _get_map_yaml(map_name)
         yaml_data = yaml.load(yaml_string, Loader=yaml.SafeLoader)
         placed_obj = construct_map(yaml_data)
 
-        # TODO initial pose and velocity from config
         pose = sample_good_starting_pose(placed_obj, only_straight=True)
         vel = geometry.se2_from_linear_angular([0, 0], 0)
         logger.info(f"Got good starting pose at: {pose}")
@@ -343,7 +342,6 @@ def run_episode(sim_ci: ComponentInterface,
                 _recv: MsgReceived[RobotState] = \
                     sim_ci.write_topic_and_expect('get_robot_state', grs,
                                                   expect='robot_state')
-            logger.debug("Received initial robot state from sim")
 
             with tt.measure(f'sim_compute_performance-{robot_name}'):
 
@@ -351,15 +349,12 @@ def run_episode(sim_ci: ComponentInterface,
                     sim_ci.write_topic_and_expect('get_robot_performance',
                                                   robot_name,
                                                   expect='robot_performance')
-            logger.debug("received robot performance from sim")
 
             with tt.measure(f'sim_render-{robot_name}'):
                 gro = GetRobotObservations(robot_name=robot_name, t_effective=t_effective)
                 recv: MsgReceived[RobotObservations] = \
                     sim_ci.write_topic_and_expect('get_robot_observations', gro,
                                                   expect='robot_observations')
-
-            logger.debug("Received robot observations from sim")
 
             with tt.measure(f'agent_compute-{robot_name}'):
                 try:
@@ -372,11 +367,11 @@ def run_episode(sim_ci: ComponentInterface,
                 except BaseException as e:
                     msg = 'Trouble with communication to the agent.'
                     raise dc.InvalidSubmission(msg) from e
-            logger.debug("Received commands from agent")
 
             with tt.measure('set_robot_commands'):
                 commands = SetRobotCommands(robot_name=robot_name, commands=r.data, t_effective=t_effective)
                 sim_ci.write_topic_and_expect_zero('set_robot_commands', commands)
+
 
         for robot_name in not_playable_robots:
             with tt.measure(f'sim_compute_robot_state-{robot_name}'):
